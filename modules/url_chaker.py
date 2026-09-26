@@ -1,6 +1,4 @@
 
-
-
 def check_urls(urls):
     print("checking urls...")
     print(urls)
