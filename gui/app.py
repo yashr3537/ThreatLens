@@ -32,7 +32,7 @@ def main(page: ft.Page):
     width=220,
     bgcolor="#0D1726",
     padding=20,
-    border=ft.Border(
+    border=ft.Border
         right=ft.BorderSide(2, "#1E4B68")
     ),
 
