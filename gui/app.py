@@ -1,46 +1,46 @@
+import sys
+from pathlib import Path
+
+# Ensure gui directory and project root are in sys.path
+GUI_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = GUI_DIR.parent
+if str(GUI_DIR) not in sys.path:
+    sys.path.insert(0, str(GUI_DIR))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import flet as ft
 
-from background import create_background
-from navigation import create_center
-from sidebar import create_sidebar
+from gui.chrome import create_statusbar, create_topbar
+from gui.components import COLORS
+from gui.background import create_background
+from gui.navigation import create_center
+from gui.sidebar import create_sidebar
 
 
 def main(page: ft.Page):
 
     page.title = "ThreatLens"
     page.padding = 0
-
-    page.theme = ft.Theme(
-        color_scheme=ft.ColorScheme(
-            primary="#00E5FF",
-            on_surface="#E5F6FF",
-        )
-    )
+    page.bgcolor = COLORS["canvas"]
+    page.theme_mode = ft.ThemeMode.DARK
+    page.theme = ft.Theme(font_family="Aptos", color_scheme=ft.ColorScheme(primary=COLORS["accent"], on_surface=COLORS["text"]))
+    page.window.width = 1440
+    page.window.height = 900
+    page.window.min_width = 1040
+    page.window.min_height = 680
 
     background = create_background()
-
-    center = create_center()
-
-    sidebar = create_sidebar(center)
-
-    ui = ft.Column(
+    center = create_center(page)
+    sidebar = create_sidebar(center.navigate)
+    center.set_sidebar(sidebar)
+    topbar = create_topbar(page, center.navigate)
+    statusbar = create_statusbar()
+    workspace = ft.Column(
         [
-            ft.Container(
-                height=30,
-                bgcolor="#0B1220",
-                border=ft.Border(
-                    bottom=ft.BorderSide(2, "#1E4B68")
-                ),
-            ),
-
-            ft.Row(
-                [
-                    sidebar,
-                    center,
-                ],
-                expand=True,
-                spacing=0,
-            ),
+            topbar,
+            ft.Row([sidebar, center], expand=True, spacing=0),
+            statusbar,
         ],
         expand=True,
         spacing=0,
@@ -48,10 +48,7 @@ def main(page: ft.Page):
 
     page.add(
         ft.Stack(
-            [
-                background,
-                ui,
-            ],
+            [background, workspace],
             expand=True,
         )
     )

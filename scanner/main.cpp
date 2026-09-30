@@ -1,77 +1,61 @@
-#include <winsock2.h>
-
 #include <algorithm>
-#include <cctype>
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "core/target.h"
+#include "discovery/subdomain.h"
 #include "network/dns.h"
 #include "network/host.h"
 #include "network/port.h"
-#include "discovery/subdomain.h"
+#include "output/json.h"
 
 namespace
 {
-std::string lowercase(std::string value)
+void print_error(const std::string& message)
 {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character)
-    {
-        return static_cast<char>(std::tolower(character));
-    });
-    return value;
+    std::cout << "{\"success\":false,\"error\":" << json_quote(message) << "}\n";
 }
 
-std::string prompt(const std::string& message)
+bool parse_number(const std::string& text, unsigned int minimum,
+    unsigned int maximum, unsigned int& value)
 {
-    std::cout << message;
-    std::string value;
-    std::getline(std::cin, value);
-    return value;
-}
-
-unsigned int prompt_number(const std::string& message, unsigned int fallback,
-    unsigned int minimum, unsigned int maximum)
-{
-    const std::string input = prompt(message);
-    if (input.empty())
-    {
-        return fallback;
-    }
-
     try
     {
         std::size_t parsed = 0;
-        const unsigned long value = std::stoul(input, &parsed);
-        if (parsed != input.size())
+        const unsigned long number = std::stoul(text, &parsed);
+        if (parsed != text.size() || number < minimum || number > maximum)
         {
-            return fallback;
+            return false;
         }
-        return static_cast<unsigned int>(std::max<unsigned long>(
-            minimum, std::min<unsigned long>(value, maximum)));
+        value = static_cast<unsigned int>(number);
+        return true;
     }
     catch (...)
     {
-        return fallback;
+        return false;
     }
 }
 
-std::vector<std::uint16_t> parse_port_list(const std::string& input)
+std::vector<std::uint16_t> parse_ports(const std::string& text)
 {
     std::vector<std::uint16_t> ports;
-    std::stringstream values(input);
+    std::stringstream values(text);
     std::string token;
 
     while (std::getline(values, token, ','))
     {
-        std::stringstream number(token);
         unsigned int port = 0;
-        char extra = 0;
-        if ((number >> port) && !(number >> extra) && port > 0 && port <= 65535)
+        if (parse_number(token, 1, 65535, port))
         {
             ports.push_back(static_cast<std::uint16_t>(port));
+        }
+        else
+        {
+            return {};
         }
     }
 
@@ -79,96 +63,222 @@ std::vector<std::uint16_t> parse_port_list(const std::string& input)
     ports.erase(std::unique(ports.begin(), ports.end()), ports.end());
     return ports;
 }
+
+void print_string_array(const std::vector<std::string>& values)
+{
+    std::cout << '[';
+    for (std::size_t index = 0; index < values.size(); ++index)
+    {
+        if (index != 0)
+        {
+            std::cout << ',';
+        }
+        std::cout << json_quote(values[index]);
+    }
+    std::cout << ']';
+}
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-    const std::string input = prompt("Enter target URL (http:// or https://): ");
-    const Target target = create_target(input);
+    std::string targetInput;
+    std::string wordlistPath;
+    std::string portMode = "common";
+    std::string portsInput;
+    bool authorized = false;
+    bool fullRangeConfirmed = false;
+    unsigned int maxCandidates = 500;
+    unsigned int dnsDelayMs = 100;
+    unsigned int timeoutMs = 500;
+    unsigned int concurrency = 8;
+    std::unordered_set<std::string> selectedModules = {
+        "target_profile", "dns", "subdomains", "hosts", "ports", "services"
+    };
 
-    if (!target.valid)
+    for (int index = 1; index < argc; ++index)
     {
-        std::cout << "\nInvalid target. Include http:// or https:// and a hostname.\n";
-        return 1;
-    }
-
-    std::cout << "\nThreatLens Phase 1 performs DNS discovery and TCP connection checks.\n"
-        << "Continue only for a system you own or are authorized to assess.\n";
-    if (lowercase(prompt("Confirm authorization (yes/no): ")) != "yes")
-    {
-        std::cout << "Scan cancelled.\n";
-        return 0;
-    }
-
-    std::cout << "\n========== TARGET PROFILE ==========\n";
-    std::cout << "Input    : " << target.input << "\n";
-    std::cout << "Scheme   : " << target.scheme << "\n";
-    std::cout << "Hostname : " << target.hostname << "\n";
-    std::cout << "Path     : " << target.path << "\n";
-    std::cout << "Port     : " << target.port << "\n";
-
-    const DnsResult dns = resolve_dns_details(target.hostname);
-    std::cout << "\n========== DNS INFORMATION ==========\n";
-    std::cout << "Status   : " << dns_status_name(dns.status) << "\n";
-    if (dns.addresses.empty())
-    {
-        std::cout << "Details  : " << dns.message << "\n";
-    }
-    for (const std::string& address : dns.addresses)
-    {
-        std::cout << "Address  : " << address << "\n";
-    }
-
-    SubdomainOptions subdomainOptions;
-    subdomainOptions.wordlistPath = prompt(
-        "Subdomain wordlist path (blank uses built-in list): ");
-    subdomainOptions.maxCandidates = prompt_number(
-        "Maximum DNS candidates (default 500, max 10000): ", 500, 1, 10000);
-    subdomainOptions.delayMs = prompt_number(
-        "Delay between DNS queries in ms (default 100, min 50): ", 100, 50, 5000);
-
-    SubdomainStats subdomainStats;
-    const std::vector<SubdomainInfo> subdomains = discover_subdomains(
-        target.hostname,
-        subdomainOptions,
-        &subdomainStats
-    );
-
-    std::cout << "\n========== SUBDOMAIN DISCOVERY ==========\n";
-    std::cout << "Candidates : " << subdomainStats.candidates << "\n";
-    std::cout << "Attempted  : " << subdomainStats.attempted << "\n";
-    std::cout << "Unresolved : " << subdomainStats.unresolved << "\n";
-    std::cout << "Timeouts   : " << subdomainStats.timedOut << "\n";
-    std::cout << "Errors     : " << subdomainStats.errors << "\n";
-    std::cout << "Invalid labels skipped: " << subdomainStats.invalidWords << "\n";
-    if (!subdomainStats.wordlistError.empty())
-    {
-        std::cout << "Wordlist   : " << subdomainStats.wordlistError << "\n";
-    }
-    if (subdomainStats.stoppedOnTimeout)
-    {
-        std::cout << "Discovery stopped after a DNS timeout to avoid excess queries.\n";
-    }
-
-    if (subdomains.empty())
-    {
-        std::cout << "No resolving subdomains found.\n";
-    }
-    else
-    {
-        for (const SubdomainInfo& subdomain : subdomains)
+        const std::string option = argv[index];
+        if (option == "--authorized")
         {
-            std::cout << subdomain.hostname << " | status: "
-                << dns_status_name(subdomain.resolutionStatus) << "\n";
-            for (const std::string& address : subdomain.addresses)
+            authorized = true;
+            continue;
+        }
+        if (option == "--full-range-confirmed")
+        {
+            fullRangeConfirmed = true;
+            continue;
+        }
+        if (index + 1 >= argc)
+        {
+            print_error("Missing value for " + option);
+            return 2;
+        }
+
+        const std::string value = argv[++index];
+        if (option == "--target")
+        {
+            targetInput = value;
+        }
+        else if (option == "--wordlist")
+        {
+            wordlistPath = value;
+        }
+        else if (option == "--port-mode")
+        {
+            portMode = value;
+        }
+        else if (option == "--ports")
+        {
+            portsInput = value;
+        }
+        else if (option == "--modules")
+        {
+            selectedModules.clear();
+            std::stringstream moduleList(value);
+            std::string module;
+            while (std::getline(moduleList, module, ','))
             {
-                std::cout << "  IP: " << address << "\n";
+                if (!module.empty())
+                {
+                    selectedModules.insert(module);
+                }
             }
+        }
+        else if (option == "--max-candidates")
+        {
+            if (!parse_number(value, 1, 10000, maxCandidates))
+            {
+                print_error("max-candidates must be between 1 and 10000");
+                return 2;
+            }
+        }
+        else if (option == "--dns-delay-ms")
+        {
+            if (!parse_number(value, 50, 5000, dnsDelayMs))
+            {
+                print_error("dns-delay-ms must be between 50 and 5000");
+                return 2;
+            }
+        }
+        else if (option == "--timeout-ms")
+        {
+            if (!parse_number(value, 100, 10000, timeoutMs))
+            {
+                print_error("timeout-ms must be between 100 and 10000");
+                return 2;
+            }
+        }
+        else if (option == "--concurrency")
+        {
+            if (!parse_number(value, 1, 32, concurrency))
+            {
+                print_error("concurrency must be between 1 and 32");
+                return 2;
+            }
+        }
+        else
+        {
+            print_error("Unknown option: " + option);
+            return 2;
         }
     }
 
+    if (!authorized)
+    {
+        print_error("Authorization confirmation is required");
+        return 2;
+    }
+    if (targetInput.empty())
+    {
+        print_error("Target URL is required");
+        return 2;
+    }
+    const std::unordered_set<std::string> supportedModules = {
+        "target_profile", "dns", "subdomains", "hosts", "ports", "services"
+    };
+    for (const std::string& module : selectedModules)
+    {
+        if (supportedModules.find(module) == supportedModules.end())
+        {
+            print_error("Unsupported Phase 1 module: " + module);
+            return 2;
+        }
+    }
+    if (selectedModules.find("target_profile") == selectedModules.end())
+    {
+        print_error("Target profile is required");
+        return 2;
+    }
+    if (selectedModules.find("services") != selectedModules.end() &&
+        selectedModules.find("ports") == selectedModules.end())
+    {
+        print_error("Service detection requires the ports module");
+        return 2;
+    }
+    if (portMode != "common" && portMode != "list" && portMode != "full")
+    {
+        print_error("port-mode must be common, list, or full");
+        return 2;
+    }
+    if (portMode == "full" && !fullRangeConfirmed)
+    {
+        print_error("Full TCP range requires explicit confirmation");
+        return 2;
+    }
+
+    const Target target = create_target(targetInput);
+    if (!target.valid)
+    {
+        print_error("Invalid target URL; include http:// or https://");
+        return 2;
+    }
+
+    PortScanOptions portOptions;
+    portOptions.timeoutMs = timeoutMs;
+    portOptions.concurrency = concurrency;
+    portOptions.detectBanner = true;
+    if (portMode == "full")
+    {
+        portOptions.fullTcpRange = true;
+    }
+    else if (portMode == "list")
+    {
+        portOptions.ports = parse_ports(portsInput);
+        if (portOptions.ports.empty())
+        {
+            print_error("A valid comma-separated port list is required for list mode");
+            return 2;
+        }
+    }
+
+    const bool runDns = selectedModules.find("dns") != selectedModules.end();
+    const bool runSubdomains = selectedModules.find("subdomains") != selectedModules.end();
+    const bool runHosts = selectedModules.find("hosts") != selectedModules.end();
+    const bool runPorts = selectedModules.find("ports") != selectedModules.end();
+    const bool runServices = selectedModules.find("services") != selectedModules.end();
+
+    DnsResult dns;
+    if (runDns || runHosts)
+    {
+        dns = resolve_dns_details(target.hostname);
+    }
+    else
+    {
+        dns.status = DnsStatus::Error;
+        dns.message = "Module not selected";
+    }
+
+    SubdomainOptions subdomainOptions;
+    subdomainOptions.wordlistPath = wordlistPath;
+    subdomainOptions.maxCandidates = maxCandidates;
+    subdomainOptions.delayMs = dnsDelayMs;
+    SubdomainStats subdomainStats;
+    const std::vector<SubdomainInfo> subdomains = runSubdomains
+        ? discover_subdomains(target.hostname, subdomainOptions, &subdomainStats)
+        : std::vector<SubdomainInfo>{};
+
     std::vector<HostInfo> hosts;
-    if (!dns.addresses.empty())
+    if (runHosts && !dns.addresses.empty())
     {
         add_host_to_inventory(hosts, {
             target.hostname,
@@ -178,80 +288,94 @@ int main()
     }
     for (const SubdomainInfo& subdomain : subdomains)
     {
-        add_host_to_inventory(hosts, {
-            subdomain.hostname,
-            subdomain.addresses,
-            dns_status_name(subdomain.resolutionStatus)
-        });
+        if (runHosts)
+        {
+            add_host_to_inventory(hosts, {
+                subdomain.hostname,
+                subdomain.addresses,
+                dns_status_name(subdomain.resolutionStatus)
+            });
+        }
     }
 
-    std::cout << "\n========== IP / HOST DISCOVERY ==========\n";
-    if (hosts.empty())
+    portOptions.detectBanner = runServices;
+    const std::vector<PortInfo> ports = runPorts
+        ? scan_ports(target.hostname, portOptions)
+        : std::vector<PortInfo>{};
+
+    std::vector<std::string> requestedModules(selectedModules.begin(), selectedModules.end());
+    std::sort(requestedModules.begin(), requestedModules.end());
+    std::cout << "{\"success\":true,\"modules_requested\":";
+    print_string_array(requestedModules);
+    std::cout << ",\"target\":{";
+    std::cout << "\"input\":" << json_quote(target.input)
+        << ",\"scheme\":" << json_quote(target.scheme)
+        << ",\"hostname\":" << json_quote(target.hostname)
+        << ",\"path\":" << json_quote(target.path)
+        << ",\"port\":" << target.port << "},\"dns\":{";
+    std::cout << "\"status\":" << json_quote(dns_status_name(dns.status))
+        << ",\"message\":" << json_quote(dns.message)
+        << ",\"selected\":" << (runDns ? "true" : "false")
+        << ",\"addresses\":";
+    print_string_array(runDns ? dns.addresses : std::vector<std::string>{});
+
+    std::cout << "},\"subdomain_discovery\":{";
+    std::cout << "\"selected\":" << (runSubdomains ? "true" : "false")
+        << ",\"candidates\":" << subdomainStats.candidates
+        << ",\"attempted\":" << subdomainStats.attempted
+        << ",\"unresolved\":" << subdomainStats.unresolved
+        << ",\"timeouts\":" << subdomainStats.timedOut
+        << ",\"errors\":" << subdomainStats.errors
+        << ",\"invalid_words\":" << subdomainStats.invalidWords
+        << ",\"stopped_on_timeout\":"
+        << (subdomainStats.stoppedOnTimeout ? "true" : "false")
+        << ",\"wordlist_error\":" << json_quote(subdomainStats.wordlistError)
+        << ",\"results\":[";
+    for (std::size_t index = 0; index < subdomains.size(); ++index)
     {
-        std::cout << "No resolved hosts in inventory.\n";
+        if (index != 0)
+        {
+            std::cout << ',';
+        }
+        const SubdomainInfo& subdomain = subdomains[index];
+        std::cout << "{\"hostname\":" << json_quote(subdomain.hostname)
+            << ",\"status\":" << json_quote(dns_status_name(subdomain.resolutionStatus))
+            << ",\"addresses\":";
+        print_string_array(subdomain.addresses);
+        std::cout << '}';
     }
-    for (const HostInfo& host : hosts)
+
+    std::cout << "]},\"hosts\":[";
+    for (std::size_t index = 0; runHosts && index < hosts.size(); ++index)
     {
-        std::cout << host.hostname << " | status: " << host.resolutionStatus << "\n";
-        for (const std::string& address : host.addresses)
+        if (index != 0)
         {
-            std::cout << "  IP: " << address << "\n";
+            std::cout << ',';
         }
+        const HostInfo& host = hosts[index];
+        std::cout << "{\"hostname\":" << json_quote(host.hostname)
+            << ",\"status\":" << json_quote(host.resolutionStatus)
+            << ",\"addresses\":";
+        print_string_array(host.addresses);
+        std::cout << '}';
     }
 
-    PortScanOptions portOptions;
-    const std::string portMode = lowercase(prompt(
-        "TCP ports: [c]ommon (default), [l]ist, or [f]ull range: "));
-    bool runPortScan = true;
-
-    if (portMode == "f" || portMode == "full")
+    std::cout << "],\"ports\":[";
+    for (std::size_t index = 0; runPorts && index < ports.size(); ++index)
     {
-        std::cout << "Full TCP scan checks ports 1-65535 and may take a while.\n";
-        if (lowercase(prompt("Confirm full-range scan (yes/no): ")) == "yes")
+        if (index != 0)
         {
-            portOptions.fullTcpRange = true;
+            std::cout << ',';
         }
-        else
-        {
-            std::cout << "Port scan skipped.\n";
-            runPortScan = false;
-        }
+        const PortInfo& item = ports[index];
+        std::cout << "{\"hostname\":" << json_quote(item.hostname)
+            << ",\"address\":" << json_quote(item.address)
+            << ",\"port\":" << item.port
+            << ",\"protocol\":" << json_quote(item.protocol)
+            << ",\"state\":" << json_quote(item.state)
+            << ",\"service\":" << json_quote(item.service)
+            << ",\"version\":" << json_quote(item.version) << '}';
     }
-    else if (portMode == "l" || portMode == "list")
-    {
-        portOptions.ports = parse_port_list(prompt(
-            "Enter TCP ports, comma-separated (1-65535): "));
-        if (portOptions.ports.empty())
-        {
-            std::cout << "No valid ports entered; using common ports.\n";
-        }
-    }
-
-    portOptions.timeoutMs = prompt_number(
-        "TCP timeout in ms (default 500, range 100-10000): ", 500, 100, 10000);
-    portOptions.concurrency = prompt_number(
-        "Concurrent connections (default 8, range 1-32): ", 8, 1, 32);
-
-    std::cout << "\n========== PORT & SERVICE INVENTORY ==========\n";
-    if (runPortScan)
-    {
-        const std::vector<PortInfo> ports = scan_ports(target.hostname, portOptions);
-        if (ports.empty())
-        {
-            std::cout << "No open TCP ports found (or the target did not resolve).\n";
-        }
-        for (const PortInfo& item : ports)
-        {
-            std::cout << item.hostname << " (" << item.address << ") "
-                << item.port << "/" << item.protocol << " " << item.state
-                << " | service: " << item.service;
-            if (!item.version.empty())
-            {
-                std::cout << " | banner: " << item.version;
-            }
-            std::cout << "\n";
-        }
-    }
-
+    std::cout << "]}\n";
     return 0;
 }
