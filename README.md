@@ -2,11 +2,11 @@
 
 **ThreatLens** is a Python/Flet desktop application with a modular C++17 Phase 1 reconnaissance scanner for authorized targets.
 
-The Python GUI and the C++ scanner currently run as separate workflows. The C++ scanner provides target profiling, DNS resolution, paced subdomain discovery, host inventory, and configurable TCP port/service checks.
+The Flet GUI launches the C++17 scanner as a child process and reads its JSON results. The scanner provides target profiling, DNS resolution, paced subdomain discovery, host inventory, and configurable TCP port/service checks.
 
 > 🚧 **Early Development — Active Prototype**
 
-The project is an active prototype. Phase 1's C++ scanner is currently a console application and has not yet been connected to the Flet GUI.
+The project is an active prototype. Build the Phase 1 scanner executable before starting a GUI scan.
 
 ---
 
@@ -21,6 +21,7 @@ The project is an active prototype. Phase 1's C++ scanner is currently a console
 * 🧭 **C++ Phase 1 target and DNS profiling**
 * 🌐 **Paced, configurable subdomain and host discovery**
 * 🔌 **Configurable IPv4/IPv6 TCP port and service inventory**
+* 📄 **Latest report retained across navigation with clipboard, TXT, and PDF export**
 * 🧩 **Modular Project Architecture**
 * ⚙️ **CLI + GUI Workflows**
 
@@ -85,7 +86,7 @@ The GUI will continue to evolve as new scanning capabilities are added.
 ThreatLens/
 │
 ├── main.py
-├── scanner.cpp                 # Legacy JSON prototype used by current GUI
+├── scanner.cpp                 # Older standalone JSON prototype
 ├── README.md
 ├── requirements.txt
 │
@@ -97,8 +98,7 @@ ThreatLens/
 │   ├── sidebar.py
 │   │
 │   └── pages/
-│       ├── m_input.py
-│       ├── scan_url.py
+│       ├── scan_url.py            # Async C++ process and JSON handling
 │       └── single_input.py
 │
 ├── modules/
@@ -180,14 +180,14 @@ python main.py
 
 ### 🛡️ C++ Phase 1 Scanner (Windows)
 
-The C++ scanner requires a Windows C++17 compiler with Winsock support. With MSYS2 UCRT64 GCC installed, run these commands from the repository root in PowerShell:
+The C++ scanner requires a Windows C++17 compiler with Winsock support. With MSYS2 UCRT64 GCC installed, the GUI builds `scanner_gui.exe` automatically on the first scan and rebuilds it when scanner sources change. To build it manually, run this from the repository root in PowerShell:
 
 ```powershell
-C:\msys64\ucrt64\bin\g++.exe -std=c++17 -Wall -Wextra scanner/main.cpp scanner/core/target.cpp scanner/network/dns.cpp scanner/network/host.cpp scanner/network/port.cpp scanner/discovery/subdomain.cpp -lws2_32 -pthread -o scanner_phase1.exe
-.\scanner_phase1.exe
+C:\msys64\ucrt64\bin\g++.exe -std=c++17 -Wall -Wextra scanner/main.cpp scanner/core/target.cpp scanner/network/dns.cpp scanner/network/host.cpp scanner/network/port.cpp scanner/discovery/subdomain.cpp scanner/output/json.cpp -lws2_32 -pthread -o scanner_gui.exe
+python gui/app.py
 ```
 
-The scanner asks for an HTTP/HTTPS URL and an authorization confirmation. For subdomains, enter a wordlist file path with one label per line, or leave it blank for the built-in list. DNS candidates are paced and capped by default.
+The GUI requires an HTTP/HTTPS URL and explicit authorization confirmation. For subdomains, enter a wordlist file path with one label per line, or leave it blank for the built-in list. DNS candidates are paced and capped by default.
 
 Choose common TCP ports by default, enter a comma-separated port list, or explicitly confirm a full TCP port range. Connection timeout and concurrency are configurable and capped. Closed and timed-out ports are omitted from the open-port results. Banner data is best-effort and may be empty.
 
@@ -215,7 +215,7 @@ Multiple URLs:
 https://example.com, https://example.org
 ```
 
-The Flet GUI provides URL input workflows. Its current `scanner.exe` call still uses the legacy JSON prototype; it does not yet launch the new interactive Phase 1 executable.
+The Flet single-target page launches `scanner_gui.exe` without a shell, passes the selected scan settings as arguments, and renders the JSON response in the five Phase 1 sections. The latest report stays available while navigating and can be copied or exported as TXT/PDF from Reports. Start the GUI with `python gui/app.py`; on the first scan it builds the executable if needed and displays compiler errors in the page.
 
 ---
 
@@ -237,7 +237,7 @@ ThreatLens is being developed incrementally.
 * [x] Configurable, paced subdomain discovery
 * [x] Structured IPv4/IPv6 host inventory
 * [x] Configurable TCP port and service inventory
-* [ ] Connect the Phase 1 scanner to the Flet GUI
+* [x] Connect the Phase 1 scanner to the Flet GUI
 
 ### Phase 2 — Scanning Engine 🚧
 
