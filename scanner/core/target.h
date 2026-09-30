@@ -6,8 +6,10 @@
 struct Target
 {
     std::string input;
+    std::string scheme;
     std::string hostname;
-    std::string ip;
+    std::string path;
+    int port;
     bool valid;
 };
 

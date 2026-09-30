@@ -1,12 +1,12 @@
 # 🛡️ ThreatLens
 
-**ThreatLens** is a Python-based cybersecurity desktop application focused on **URL analysis, validation, and future web security scanning workflows**.
+**ThreatLens** is a Python/Flet desktop application with a modular C++17 Phase 1 reconnaissance scanner for authorized targets.
 
-The project is being developed as a **modular security analysis platform** with a Flet-based desktop interface and a Python-based CLI workflow for handling single and multiple URLs.
+The Python GUI and the C++ scanner currently run as separate workflows. The C++ scanner provides target profiling, DNS resolution, paced subdomain discovery, host inventory, and configurable TCP port/service checks.
 
 > 🚧 **Early Development — Active Prototype**
 
-The current version focuses on building a clean application structure, URL input workflows, GUI navigation, and validation logic. A dedicated security scanning engine will be integrated in future development stages.
+The project is an active prototype. Phase 1's C++ scanner is currently a console application and has not yet been connected to the Flet GUI.
 
 ---
 
@@ -18,9 +18,11 @@ The current version focuses on building a clean application structure, URL input
 * 🖥️ **Flet-based Desktop GUI**
 * 📊 **Dashboard & Sidebar Navigation**
 * 🔍 **Basic URL Validation**
+* 🧭 **C++ Phase 1 target and DNS profiling**
+* 🌐 **Paced, configurable subdomain and host discovery**
+* 🔌 **Configurable IPv4/IPv6 TCP port and service inventory**
 * 🧩 **Modular Project Architecture**
 * ⚙️ **CLI + GUI Workflows**
-* 🚧 **Scanner Engine Placeholder**
 
 ---
 
@@ -70,6 +72,8 @@ The GUI will continue to evolve as new scanning capabilities are added.
 | 🐍 Python 3.10+         | Core application logic |
 | 🖥️ Flet                | Desktop GUI            |
 | 📄 Python File Handling | URL import & storage   |
+| ⚙️ C++17                | Phase 1 scanner        |
+| 🪟 Windows Winsock      | DNS and TCP networking |
 | 🔗 HTTP/HTTPS           | Future web analysis    |
 | 🧩 Modular Python       | Project architecture   |
 
@@ -81,6 +85,7 @@ The GUI will continue to evolve as new scanning capabilities are added.
 ThreatLens/
 │
 ├── main.py
+├── scanner.cpp                 # Legacy JSON prototype used by current GUI
 ├── README.md
 ├── requirements.txt
 │
@@ -101,7 +106,23 @@ ThreatLens/
 │   ├── url_chaker.py
 │   └── url_impoter.py
 │
-└── .venv/
+└── scanner/
+    ├── main.cpp                # Phase 1 console entrypoint
+    ├── analysis/               # Reserved for a later phase
+    ├── core/
+    │   ├── result.cpp / result.h
+    │   ├── scanner.cpp / scanner.h
+    │   └── target.cpp / target.h
+    ├── discovery/
+    │   └── subdomain.cpp / subdomain.h
+    ├── network/
+    │   ├── dns.cpp / dns.h
+    │   ├── host.cpp / host.h
+    │   └── port.cpp / port.h
+    ├── output/
+    │   ├── json.cpp / json.h
+    │   └── report.cpp / report.h
+    └── web/                    # Reserved for a later phase
 ```
 
 ---
@@ -157,11 +178,26 @@ python gui/app.py
 python main.py
 ```
 
+### 🛡️ C++ Phase 1 Scanner (Windows)
+
+The C++ scanner requires a Windows C++17 compiler with Winsock support. With MSYS2 UCRT64 GCC installed, run these commands from the repository root in PowerShell:
+
+```powershell
+C:\msys64\ucrt64\bin\g++.exe -std=c++17 -Wall -Wextra scanner/main.cpp scanner/core/target.cpp scanner/network/dns.cpp scanner/network/host.cpp scanner/network/port.cpp scanner/discovery/subdomain.cpp -lws2_32 -pthread -o scanner_phase1.exe
+.\scanner_phase1.exe
+```
+
+The scanner asks for an HTTP/HTTPS URL and an authorization confirmation. For subdomains, enter a wordlist file path with one label per line, or leave it blank for the built-in list. DNS candidates are paced and capped by default.
+
+Choose common TCP ports by default, enter a comma-separated port list, or explicitly confirm a full TCP port range. Connection timeout and concurrency are configurable and capped. Closed and timed-out ports are omitted from the open-port results. Banner data is best-effort and may be empty.
+
+Only scan systems you own or are explicitly authorized to assess. Full-range scans can take longer and create more network traffic.
+
 ---
 
 ## 🔗 URL Input Workflow
 
-The current CLI supports:
+The Python CLI supports:
 
 ```text
 1. Single URL
@@ -179,7 +215,7 @@ Multiple URLs:
 https://example.com, https://example.org
 ```
 
-The GUI provides a dedicated scanner interface for handling URL-based workflows.
+The Flet GUI provides URL input workflows. Its current `scanner.exe` call still uses the legacy JSON prototype; it does not yet launch the new interactive Phase 1 executable.
 
 ---
 
@@ -187,7 +223,7 @@ The GUI provides a dedicated scanner interface for handling URL-based workflows.
 
 ThreatLens is being developed incrementally.
 
-### Phase 1 — Foundation ✅
+### Phase 1 — Foundation and C++ Recon ✅
 
 * [x] Project structure
 * [x] Python CLI workflow
@@ -197,6 +233,11 @@ ThreatLens is being developed incrementally.
 * [x] Basic URL validation
 * [x] Flet desktop interface
 * [x] Dashboard and navigation
+* [x] Target profile and DNS resolution
+* [x] Configurable, paced subdomain discovery
+* [x] Structured IPv4/IPv6 host inventory
+* [x] Configurable TCP port and service inventory
+* [ ] Connect the Phase 1 scanner to the Flet GUI
 
 ### Phase 2 — Scanning Engine 🚧
 
@@ -245,7 +286,7 @@ Rather than implementing everything at once, the project will gradually evolve i
 
 The current release primarily focuses on:
 
-> **URL input + validation + desktop interface + project architecture**
+> **Python URL workflows + Flet interface + standalone C++ Phase 1 scanner**
 
 The deeper security scanning engine is planned for upcoming development stages.
 
