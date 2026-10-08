@@ -1,1 +1,0 @@
-"""Real, bounded providers used by the desktop scan coordinator."""
