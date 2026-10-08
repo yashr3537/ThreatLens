@@ -1,0 +1,81 @@
+[submodule "RECON/amass"]
+	path = RECON/amass
+	url = https://github.com/owasp-amass/amass.git
+[submodule "RECON/assetfinder"]
+	path = RECON/assetfinder
+	url = https://github.com/tomnomnom/assetfinder.git
+[submodule "RECON/dnsx"]
+	path = RECON/dnsx
+	url = https://github.com/projectdiscovery/dnsx.git
+[submodule "RECON/httpx"]
+	path = RECON/httpx
+	url = https://github.com/projectdiscovery/httpx.git
+[submodule "RECON/naabu"]
+	path = RECON/naabu
+	url = https://github.com/projectdiscovery/naabu.git
+[submodule "RECON/subfinder"]
+	path = RECON/subfinder
+	url = https://github.com/projectdiscovery/subfinder.git
+[submodule "SCANNING/nmap"]
+	path = SCANNING/nmap
+	url = https://github.com/nmap/nmap.git
+[submodule "SCANNING/nuclei"]
+	path = SCANNING/nuclei
+	url = https://github.com/projectdiscovery/nuclei.git
+[submodule "SCANNING/RustScan"]
+	path = SCANNING/RustScan
+	url = https://github.com/RustScan/RustScan.git
+[submodule "WEB DISCOVERY/katana"]
+	path = WEB DISCOVERY/katana
+	url = https://github.com/projectdiscovery/katana.git
+[submodule "WEB DISCOVERY/gospider"]
+	path = WEB DISCOVERY/gospider
+	url = https://github.com/jaeles-project/gospider.git
+[submodule "WEB DISCOVERY/waybackurls"]
+	path = WEB DISCOVERY/waybackurls
+	url = https://github.com/tomnomnom/waybackurls.git
+[submodule "WEB DISCOVERY/ffuf"]
+	path = WEB DISCOVERY/ffuf
+	url = https://github.com/ffuf/ffuf.git
+[submodule "WEB DISCOVERY/gobuster"]
+	path = WEB DISCOVERY/gobuster
+	url = https://github.com/OJ/gobuster.git
+[submodule "WEB DISCOVERY/feroxbuster"]
+	path = WEB DISCOVERY/feroxbuster
+	url = https://github.com/epi052/feroxbuster.git
+[submodule "JAVASCRIPT/jsluice"]
+	path = JAVASCRIPT/jsluice
+	url = https://github.com/BishopFox/jsluice.git
+[submodule "JAVASCRIPT/LinkFinder"]
+	path = JAVASCRIPT/LinkFinder
+	url = https://github.com/GerbenJavado/LinkFinder.git
+[submodule "JAVASCRIPT/SecretFinder"]
+	path = JAVASCRIPT/SecretFinder
+	url = https://github.com/m4ll0k/SecretFinder.git
+[submodule "PARAMETERS/Arjun"]
+	path = PARAMETERS/Arjun
+	url = https://github.com/s0md3v/Arjun.git
+[submodule "PARAMETERS/ParamSpider"]
+	path = PARAMETERS/ParamSpider
+	url = https://github.com/devanshbatham/ParamSpider.git
+[submodule "VULNERABILITY TESTING/SSRFmap"]
+	path = VULNERABILITY TESTING/SSRFmap
+	url = https://github.com/swisskyrepo/SSRFmap.git
+[submodule "VULNERABILITY TESTING/XSStrike"]
+	path = VULNERABILITY TESTING/XSStrike
+	url = https://github.com/s0md3v/XSStrike.git
+[submodule "VULNERABILITY TESTING/dalfox"]
+	path = VULNERABILITY TESTING/dalfox
+	url = https://github.com/hahwul/dalfox.git
+[submodule "VULNERABILITY TESTING/interactsh"]
+	path = VULNERABILITY TESTING/interactsh
+	url = https://github.com/projectdiscovery/interactsh.git
+[submodule "VULNERABILITY TESTING/jwt_tool"]
+	path = VULNERABILITY TESTING/jwt_tool
+	url = https://github.com/ticarpi/jwt_tool.git
+[submodule "VULNERABILITY TESTING/sqlmap"]
+	path = VULNERABILITY TESTING/sqlmap
+	url = https://github.com/sqlmapproject/sqlmap.git
+[submodule "PASSWORD AUDITING/john"]
+	path = PASSWORD AUDITING/john
+	url = https://github.com/openwall/john.git
